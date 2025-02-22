@@ -1,4 +1,4 @@
-from charm.toolbox.integergroup import IntegerGroupQ, integer
+from charm.toolbox.integergroup import IntegerGroupQ, integer, PairingGroup, G1, G2, GT
 from typing import List, Dict, Tuple
 from src.helpers.additive_elgamal import AdditiveElGamal, ElGamalCipher
 from src.helpers.helpers import reduce_vector_mod, get_int
@@ -7,27 +7,39 @@ import charm
 import numpy as np
 import hashlib
 
+security_param = 1024
 # from src.helpers import dummy_discrete_log, get_int, get_modulus
+pairing_group = PairingGroup('SS512', secparam=security_param)
+input_G1 = G1
+input_G2 = G2
+input_GT = GT
+g1_generator = pairing_group.random(G1)
+g2_generator = pairing_group.random(G2)
+p = pairing_group.order()
 
 IntegerGroupElement = charm.core.math.integer.integer
 ElGamalKey = Dict[str, IntegerGroupElement]
 # 生成群
 debug = True
-p = integer(
-    148829018183496626261556856344710600327516732500226144177322012998064772051982752493460332138204351040296264880017943408846937646702376203733370973197019636813306480144595809796154634625021213611577190781215296823124523899584781302512549499802030946698512327294159881907114777803654670044046376468983244647367)
-q = integer(
-    74414509091748313130778428172355300163758366250113072088661006499032386025991376246730166069102175520148132440008971704423468823351188101866685486598509818406653240072297904898077317312510606805788595390607648411562261949792390651256274749901015473349256163647079940953557388901827335022023188234491622323683)
-elgamal_group = IntegerGroupQ()
-elgamal = AdditiveElGamal(elgamal_group, p, q)
-elgamal_params = {"group": elgamal_group, "p": int(p)}
-G2_group = IntegerGroupQ()
-G2 = AdditiveElGamal(G2_group, p, q)
-G2_params = {"group": G2_group, "p": int(p)}
+group = PairingGroup('SS512')
+G1_order = G1
+
+
+# p = integer(
+#     148829018183496626261556856344710600327516732500226144177322012998064772051982752493460332138204351040296264880017943408846937646702376203733370973197019636813306480144595809796154634625021213611577190781215296823124523899584781302512549499802030946698512327294159881907114777803654670044046376468983244647367)
+# q = integer(
+#     74414509091748313130778428172355300163758366250113072088661006499032386025991376246730166069102175520148132440008971704423468823351188101866685486598509818406653240072297904898077317312510606805788595390607648411562261949792390651256274749901015473349256163647079940953557388901827335022023188234491622323683)
+# elgamal_group = IntegerGroupQ()
+# elgamal = AdditiveElGamal(elgamal_group, p, q)
+elgamal_params = {"group": G1, "p": int(p)}
+# G2_group = IntegerGroupQ()
+# G2 = AdditiveElGamal(G2_group, p, q)
+# G2_params = {"group": G2_group, "p": int(p)}
 
 
 # 输出群
 def output_p():
-    return {"group": elgamal_group, "p": int(p)}
+    return {"group": G1, "p": int(p)}
 
 
 # 创建哈希函数H1
@@ -39,12 +51,12 @@ def H1(data: str, p: integer) -> integer:
 # 定义哈希函数 H0: {0, 1}* -> G2
 def H0(data: str) -> IntegerGroupElement:
     hash_object = hashlib.sha256(data.encode('utf-8')).hexdigest()
-    return elgamal_group.hash(hash_object, G2)
+    return G1.hash(hash_object, G2)
 
 
 # 定义双线性配对
-def bilinear_pairing(P, Q):
-    return elgamal.pairing(P, Q)
+def bilinear_pairing(G1_ele, G2_ele):
+    return group.pair(G1_ele, G2_ele)
 
 
 # 生成公钥密钥
@@ -58,13 +70,12 @@ def set_up(security_parameter: int, vector_length: int, G) -> Tuple[List[ElGamal
 
 # 生成功能密钥
 def KeyDerive(master_secret_key: List[ElGamalKey], master_public_key2: List[ElGamalKey],
-              master_secret_key2: List[ElGamalKey], ctr: int, y: List[int], aux: str) -> integer:
+               ctr: int, y: List[int], aux: str) -> integer:
     y = reduce_vector_mod(y, elgamal_params['p'])  # y的个数要跟encrtyptor的个数一致，encryptor个数为3，y的长度也为3
     ctr += 1  # 计数器增加1。
     skf = integer(0)  # 初始化一个'skf'，初始值为整数0
 
     for i in range(len(y)):
-        sk2i = master_secret_key2[i]  # 获取次级公钥列表中的第i个公钥。
         pk2i = master_public_key2[i]
 
         # if 'x' not in pk2i: # 如果该次级公钥缺少'x'分量，则抛出错误。
@@ -155,3 +166,10 @@ def dummy_discrete_log(a: int, b: int, mod: int, limit: int) -> int:
         if pow(a, i, mod) == b:
             return i
     return None
+
+
+def verify(T_t_agg, g2, ctr, VK_t_agg, g1, n, W_t_1, aux_public_key):
+    bilinear_left = bilinear_pairing(T_t_agg, g2)
+    g1_exvp = n * W_t_1
+    bilinear_right = bilinear_pairing(H0(ctr), VK_t_agg) * bilinear_pairing(g1 ** g1_exvp, aux_public_key)
+    return bilinear_right == bilinear_left

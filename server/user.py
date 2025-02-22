@@ -13,20 +13,19 @@ class User(object):
         self.public_key = master_public_key[0]
         self.secret_key = master_secret_key[0]
 
-    def set_tk(self):
-        self.tk = random.randint(0, self.common_param.p)
+    def set_tk(self,tk):
+        self.tk = tk
 
     def train_task(self):
         # todo：函数待补充
         self.W_t = None
 
-    def secure_agg(self, agg_pub_key, ctr, aux):
+    def secure_agg(self, kgc_pub_key, agg_pub_key, ctr, aux, aux_public_key):
+        kgc_pub_key_arr = [kgc_pub_key]
         agg_pub_key_arr = [agg_pub_key]
-        user_pub_key_arr = [self.public_key]
         user_sec_key_arr = [self.secret_key]
-        ct_t = nddf.Encrypt(agg_pub_key_arr, user_pub_key_arr, user_sec_key_arr, ctr, self.tk, aux)
+        ct_t = nddf.Encrypt(kgc_pub_key_arr, user_sec_key_arr, agg_pub_key_arr, ctr, self.tk, aux)
         h0_data = nddf.H0(ctr)
         T_t = (h0_data ** self.tk) * (self.common_param.g1 ** self.W_t)
-        self.ct_t = ct_t
-        self.T_t = T_t
-        return ct_t, T_t
+        VK_t = aux_public_key ** self.tk
+        return ct_t, T_t, VK_t

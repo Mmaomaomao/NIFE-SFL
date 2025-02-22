@@ -11,16 +11,14 @@ class KGC(object):
         self.public_key = master_public_key[0]
         self.secret_key = master_secret_key[0]
 
-    def run_key_drive(self, master_secret_key,ctr):
-        sk_convolution, skf = nddf.KeyDerive(master_secret_key, self.master_public_key, self.master_public_key,
-                                             ctr, self.y, self.aux)
-
-        self.sk_convolution = sk_convolution
-        self.skf = skf
-
-    def key_drive(self, users_master_public_key, users_master_secret_key,ctr, y, aux):
+    def key_drive(self, users_master_public_key, ctr, y, aux):
         secret_key = [self.secret_key]
-        skf = nddf.KeyDerive(secret_key, users_master_public_key, users_master_secret_key, ctr, y,
+        skf = nddf.KeyDerive(secret_key, users_master_public_key, ctr, y,
                              aux)
         return skf
 
+    def secure_agg(self, VK_t_arr):
+        VK_t_agg = 1
+        for VK_t in VK_t_arr:
+            VK_t_agg = VK_t_agg * VK_t
+        return VK_t_agg

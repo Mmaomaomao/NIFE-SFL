@@ -14,6 +14,12 @@ class AggServer(object):
         self.public_key = master_public_key[0]
         self.secret_key = master_secret_key[0]
 
-
-
-
+    def secure_agg(self, kgc_pub_key, skf, C_t, y, T_t_arr):
+        kgc_pub_key_arr = [kgc_pub_key]
+        self_sec_key_arr = [self.secret_key]
+        W_t_1 = nddf.Decrypt(kgc_pub_key_arr, skf, self_sec_key_arr, C_t, y)
+        T_t_agg = 1
+        for T_t in T_t_arr:
+            T_t_agg = T_t_agg * T_t
+        T_t_agg = T_t_agg ** self.secret_key
+        return W_t_1, T_t_agg
